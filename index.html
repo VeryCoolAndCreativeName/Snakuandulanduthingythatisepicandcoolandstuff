@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Snakes & Ladders (Final)</title>
+<title>Snakes & Ladders (Final Polished)</title>
 
 <style>
 body {
@@ -11,32 +11,30 @@ body {
     background-color: lightblue;
 }
 
-/* Board wrapper for layering */
 #boardContainer {
     position: relative;
     display: inline-block;
 }
 
-/* SVG layer for snakes/ladders */
+/* SVG LINES (snakes & ladders) */
 #lineLayer {
     position: absolute;
     top: 0;
     left: 0;
-    z-index: 1;
+    z-index: 2; /* above tiles, below text/players */
     pointer-events: none;
 }
 
-/* Board */
+/* BOARD */
 #board {
     display: grid;
     grid-template-columns: repeat(5, 80px);
     gap: 5px;
-    justify-content: center;
     position: relative;
-    z-index: 2;
+    z-index: 3;
 }
 
-/* Squares */
+/* TILES */
 .square {
     width: 80px;
     height: 80px;
@@ -47,20 +45,27 @@ body {
     justify-content: center;
     position: relative;
     font-size: 12px;
+    z-index: 3;
 }
 
-/* Players on top */
+/* PLAYERS */
 .player {
     width: 14px;
     height: 14px;
     border-radius: 50%;
     position: absolute;
-    z-index: 3;
+    z-index: 4;
 }
 
-/* Dice */
+/* DICE */
 #diceArea img {
     width: 60px;
+}
+
+/* WIN SCREEN */
+#trophy {
+    display: none;
+    margin-top: 20px;
 }
 </style>
 </head>
@@ -105,12 +110,21 @@ body {
 
 <p id="status"></p>
 
+<!-- TROPHY -->
+<div id="trophy">
+    <h2 id="winnerText"></h2>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/1934_Melbourne_Cup%2C_National_Museum_of_Australia.jpg/960px-1934_Melbourne_Cup%2C_National_Museum_of_Australia.jpg"
+         width="200">
+</div>
+
 <script>
 const maxSquares = 20;
 let players = [];
 let currentPlayer = 0;
 let dice1 = 0;
 let dice2 = 0;
+let lastRoll = null;
+let diceLocked = false;
 
 let snakes = {};
 let ladders = {};
@@ -126,7 +140,7 @@ const diceImages = {
 6:"https://upload.wikimedia.org/wikipedia/commons/2/26/Dice-6-b.svg"
 };
 
-/* ---------------- NAME INPUT ---------------- */
+/* NAME INPUT */
 function generateNameInputs(){
     let num = document.getElementById("numPlayers").value;
     let div = document.getElementById("nameInputs");
@@ -134,15 +148,14 @@ function generateNameInputs(){
 
     for(let i=0;i<num;i++){
         div.innerHTML += `
-            Player ${i+1}: 
-            <input id="playerName${i}" placeholder="Player ${i+1}"><br>
-        `;
+        Player ${i+1}:
+        <input id="playerName${i}" placeholder="Player ${i+1}"><br>`;
     }
 
     div.innerHTML += `<button onclick="setupGame()">Start Game</button>`;
 }
 
-/* ---------------- GAME SETUP ---------------- */
+/* SETUP */
 function setupGame(){
     let num = document.getElementById("numPlayers").value;
     players = [];
@@ -166,16 +179,14 @@ function setupGame(){
     updateStatus("Game started!");
 }
 
-/* ---------------- SNAKES & LADDERS ---------------- */
+/* RANDOM S&L */
 function generateSnakesLadders(){
     snakes = {};
     ladders = {};
     let used = new Set([1,20]);
 
-    // Ladders
     for(let i=0;i<4;i++){
         let s,e;
-
         do{s = rand(2,18);}while(used.has(s));
         do{e = rand(s+1,19);}while(e===20);
 
@@ -183,10 +194,8 @@ function generateSnakesLadders(){
         used.add(s);
     }
 
-    // Snakes
     for(let i=0;i<4;i++){
         let s,e;
-
         do{s = rand(3,19);}while(used.has(s));
         do{e = rand(2,s-1);}while(e===1);
 
@@ -195,7 +204,7 @@ function generateSnakesLadders(){
     }
 }
 
-/* ---------------- BOARD ---------------- */
+/* BOARD */
 function createBoard(){
     let board = document.getElementById("board");
     board.innerHTML = "";
@@ -214,7 +223,7 @@ function createBoard(){
     }
 }
 
-/* ---------------- DRAW LINES ---------------- */
+/* DRAW LINES */
 function drawConnections(){
     const svg = document.getElementById("lineLayer");
     svg.innerHTML = "";
@@ -247,10 +256,10 @@ function drawConnections(){
     }
 
     for(let s in ladders) drawLine(s,ladders[s],"brown");
-    for(let s in snakes) drawLine(s,snakes[s],"red");
+    for(let s in snakes) drawLine(s,snakes[s],"blue");
 }
 
-/* ---------------- PLAYER UPDATE ---------------- */
+/* PLAYERS */
 function updatePlayers(){
     document.querySelectorAll(".player").forEach(p=>p.remove());
 
@@ -266,26 +275,34 @@ function updatePlayers(){
     });
 }
 
-/* ---------------- DICE ---------------- */
+/* DICE */
 function rollDice(){
+
+    if(diceLocked) return;
+
     dice1 = rand(1,6);
     dice2 = rand(1,6);
+
+    lastRoll = dice1 + dice2;
+    diceLocked = true;
 
     document.getElementById("diceImg1").src = diceImages[dice1];
     document.getElementById("diceImg2").src = diceImages[dice2];
 
-    updateStatus("Enter sum!");
+    updateStatus("Enter SUM!");
 }
 
-/* ---------------- SUBMIT ---------------- */
+/* SUBMIT */
 function submitAnswer(){
-    let sum = Number(document.getElementById("sumInput").value);
-    let correct = dice1 + dice2;
 
+    if(!diceLocked) return;
+
+    let sum = Number(document.getElementById("sumInput").value);
     let p = players[currentPlayer];
 
-    if(sum === correct){
-        p.position += correct;
+    if(sum === lastRoll){
+
+        p.position += lastRoll;
 
         if(p.position > 20) p.position = 20;
 
@@ -293,36 +310,48 @@ function submitAnswer(){
         if(snakes[p.position]) p.position = snakes[p.position];
 
         if(p.position === 20){
-            alert(p.name + " wins!");
+            showWin(p.name);
         }
 
         updateStatus("Correct!");
+
     } else {
-        updateStatus("Wrong! was " + correct);
+        updateStatus("Wrong! was " + lastRoll);
     }
 
     currentPlayer = (currentPlayer + 1) % players.length;
+    diceLocked = false;
+
     updatePlayers();
 }
 
-/* ---------------- STATUS ---------------- */
+/* WIN */
+function showWin(name){
+    document.getElementById("winnerText").innerText = name + " Wins!";
+    document.getElementById("trophy").style.display = "block";
+}
+
+/* STATUS */
 function updateStatus(msg){
     let p = players[currentPlayer];
     document.getElementById("status").innerText =
         msg + " " + p.name + "'s turn (" + p.color + ")";
 }
 
-/* ---------------- RESET ---------------- */
+/* RESET */
 function resetGame(){
     players = [];
     snakes = {};
     ladders = {};
+    diceLocked = false;
+
     document.getElementById("board").innerHTML = "";
     document.getElementById("lineLayer").innerHTML = "";
+    document.getElementById("trophy").style.display = "none";
     document.getElementById("status").innerText = "Reset!";
 }
 
-/* ---------------- UTIL ---------------- */
+/* UTIL */
 function rand(min,max){
     return Math.floor(Math.random()*(max-min+1))+min;
 }
