@@ -2,204 +2,329 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Simple Snakes & Ladders</title>
+<title>Snakes & Ladders (Final)</title>
 
 <style>
-    body {
-        font-family: Arial;
-        text-align: center;
-        background-color: lightblue; /* CHANGE BACKGROUND HERE */
-    }
+body {
+    font-family: Arial;
+    text-align: center;
+    background-color: lightblue;
+}
 
-    #board {
-        display: grid;
-        grid-template-columns: repeat(5, 80px);
-        grid-gap: 5px;
-        justify-content: center;
-        margin: 20px;
-    }
+/* Board wrapper for layering */
+#boardContainer {
+    position: relative;
+    display: inline-block;
+}
 
-    .square {
-        width: 80px;
-        height: 80px;
-        border: 1px solid black;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: white;
-        position: relative;
-    }
+/* SVG layer for snakes/ladders */
+#lineLayer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    pointer-events: none;
+}
 
-    .player {
-        width: 15px;
-        height: 15px;
-        border-radius: 50%;
-        position: absolute;
-    }
+/* Board */
+#board {
+    display: grid;
+    grid-template-columns: repeat(5, 80px);
+    gap: 5px;
+    justify-content: center;
+    position: relative;
+    z-index: 2;
+}
 
-    #controls {
-        margin-top: 20px;
-    }
+/* Squares */
+.square {
+    width: 80px;
+    height: 80px;
+    border: 1px solid black;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    font-size: 12px;
+}
+
+/* Players on top */
+.player {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    position: absolute;
+    z-index: 3;
+}
+
+/* Dice */
+#diceArea img {
+    width: 60px;
+}
 </style>
 </head>
 
 <body>
 
-<h1>Snakes & Ladders (Basic Version)</h1>
+<h1>Snakes & Ladders (Final Version)</h1>
 
 <!-- BOARD -->
-<div id="board"></div>
-
-<!-- CONTROLS -->
-<div id="controls">
-    <label>Number of Players:</label>
-    <input type="number" id="numPlayers" min="1" max="4" value="2">
-    <button onclick="setupGame()">Start Game</button>
-    <br><br>
-
-    <label>Dice 1:</label>
-    <input type="number" id="dice1" min="1" max="6">
-    <label>Dice 2:</label>
-    <input type="number" id="dice2" min="1" max="6">
-
-    <button onclick="rollDice()">Submit Dice</button>
-    <button onclick="resetGame()">Reset</button>
-
-    <p id="status"></p>
+<div id="boardContainer">
+    <svg id="lineLayer"></svg>
+    <div id="board"></div>
 </div>
+
+<!-- DICE -->
+<div id="diceArea">
+    <img id="diceImg1">
+    <img id="diceImg2">
+</div>
+
+<!-- PLAYER SETUP -->
+<div>
+    <label>Players:</label>
+    <input type="number" id="numPlayers" min="1" max="4" value="2">
+    <button onclick="generateNameInputs()">Set Names</button>
+    <div id="nameInputs"></div>
+</div>
+
+<br>
+
+<button onclick="rollDice()">Roll Dice</button>
+
+<br><br>
+
+<label>Enter SUM:</label>
+<input type="number" id="sumInput">
+<button onclick="submitAnswer()">Submit</button>
+
+<br><br>
+
+<button onclick="resetGame()">Reset</button>
+
+<p id="status"></p>
 
 <script>
 const maxSquares = 20;
 let players = [];
 let currentPlayer = 0;
+let dice1 = 0;
+let dice2 = 0;
 
-// Colors for players
-const colors = ["red", "blue", "green", "purple"];
+let snakes = {};
+let ladders = {};
 
-/*
-    CREATE BOARD
-    - Generates 20 squares
-    - Each square shows its coordinate (number)
-*/
-function createBoard() {
-    const board = document.getElementById("board");
-    board.innerHTML = "";
+const colors = ["red","blue","green","purple"];
 
-    for (let i = 1; i <= maxSquares; i++) {
-        const square = document.createElement("div");
-        square.classList.add("square");
-        square.id = "sq-" + i;
+const diceImages = {
+1:"https://upload.wikimedia.org/wikipedia/commons/1/1b/Dice-1-b.svg",
+2:"https://upload.wikimedia.org/wikipedia/commons/5/5f/Dice-2-b.svg",
+3:"https://upload.wikimedia.org/wikipedia/commons/b/b1/Dice-3-b.svg",
+4:"https://upload.wikimedia.org/wikipedia/commons/f/fd/Dice-4-b.svg",
+5:"https://upload.wikimedia.org/wikipedia/commons/0/08/Dice-5-b.svg",
+6:"https://upload.wikimedia.org/wikipedia/commons/2/26/Dice-6-b.svg"
+};
 
-        // Show coordinate number
-        square.innerText = i;
+/* ---------------- NAME INPUT ---------------- */
+function generateNameInputs(){
+    let num = document.getElementById("numPlayers").value;
+    let div = document.getElementById("nameInputs");
+    div.innerHTML = "";
 
-        board.appendChild(square);
+    for(let i=0;i<num;i++){
+        div.innerHTML += `
+            Player ${i+1}: 
+            <input id="playerName${i}" placeholder="Player ${i+1}"><br>
+        `;
     }
+
+    div.innerHTML += `<button onclick="setupGame()">Start Game</button>`;
 }
 
-/*
-    SETUP GAME
-    - Creates players based on user input
-    - Places them at position 1
-*/
-function setupGame() {
-    const num = document.getElementById("numPlayers").value;
-
+/* ---------------- GAME SETUP ---------------- */
+function setupGame(){
+    let num = document.getElementById("numPlayers").value;
     players = [];
 
-    for (let i = 0; i < num; i++) {
+    for(let i=0;i<num;i++){
+        let name = document.getElementById("playerName"+i).value;
+
         players.push({
-            position: 1
+            position:1,
+            name:name || `Player ${i+1}`,
+            color:colors[i]
         });
     }
 
-    currentPlayer = 0;
+    generateSnakesLadders();
     createBoard();
+    drawConnections();
+
+    currentPlayer = 0;
     updatePlayers();
-    updateStatus();
+    updateStatus("Game started!");
 }
 
-/*
-    UPDATE PLAYER POSITIONS
-    - Draws players on board
-*/
-function updatePlayers() {
-    // Clear all player markers
-    document.querySelectorAll(".player").forEach(p => p.remove());
+/* ---------------- SNAKES & LADDERS ---------------- */
+function generateSnakesLadders(){
+    snakes = {};
+    ladders = {};
+    let used = new Set([1,20]);
 
-    players.forEach((player, index) => {
-        const square = document.getElementById("sq-" + player.position);
+    // Ladders
+    for(let i=0;i<4;i++){
+        let s,e;
 
-        const piece = document.createElement("div");
+        do{s = rand(2,18);}while(used.has(s));
+        do{e = rand(s+1,19);}while(e===20);
+
+        ladders[s]=e;
+        used.add(s);
+    }
+
+    // Snakes
+    for(let i=0;i<4;i++){
+        let s,e;
+
+        do{s = rand(3,19);}while(used.has(s));
+        do{e = rand(2,s-1);}while(e===1);
+
+        snakes[s]=e;
+        used.add(s);
+    }
+}
+
+/* ---------------- BOARD ---------------- */
+function createBoard(){
+    let board = document.getElementById("board");
+    board.innerHTML = "";
+
+    for(let i=1;i<=maxSquares;i++){
+        let sq = document.createElement("div");
+        sq.classList.add("square");
+        sq.id = "sq-"+i;
+
+        let label = i;
+        if(ladders[i]) label += " 🪜";
+        if(snakes[i]) label += " 🐍";
+
+        sq.innerText = label;
+        board.appendChild(sq);
+    }
+}
+
+/* ---------------- DRAW LINES ---------------- */
+function drawConnections(){
+    const svg = document.getElementById("lineLayer");
+    svg.innerHTML = "";
+
+    const boardRect = document.getElementById("board").getBoundingClientRect();
+
+    svg.setAttribute("width", boardRect.width);
+    svg.setAttribute("height", boardRect.height);
+
+    function drawLine(a,b,color){
+        const A = document.getElementById("sq-"+a).getBoundingClientRect();
+        const B = document.getElementById("sq-"+b).getBoundingClientRect();
+
+        const x1 = A.left + A.width/2 - boardRect.left;
+        const y1 = A.top + A.height/2 - boardRect.top;
+
+        const x2 = B.left + B.width/2 - boardRect.left;
+        const y2 = B.top + B.height/2 - boardRect.top;
+
+        const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+
+        line.setAttribute("x1",x1);
+        line.setAttribute("y1",y1);
+        line.setAttribute("x2",x2);
+        line.setAttribute("y2",y2);
+        line.setAttribute("stroke",color);
+        line.setAttribute("stroke-width","6");
+
+        svg.appendChild(line);
+    }
+
+    for(let s in ladders) drawLine(s,ladders[s],"brown");
+    for(let s in snakes) drawLine(s,snakes[s],"red");
+}
+
+/* ---------------- PLAYER UPDATE ---------------- */
+function updatePlayers(){
+    document.querySelectorAll(".player").forEach(p=>p.remove());
+
+    players.forEach((p,i)=>{
+        let sq = document.getElementById("sq-"+p.position);
+
+        let piece = document.createElement("div");
         piece.classList.add("player");
-        piece.style.background = colors[index];
-        piece.style.top = (index * 15) + "px"; // stack players visually
+        piece.style.background = p.color;
+        piece.style.top = (i*15)+"px";
 
-        square.appendChild(piece);
+        sq.appendChild(piece);
     });
 }
 
-/*
-    HANDLE DICE INPUT
-    - Randomly generate real dice values
-    - User must match BOTH dice correctly to move
-*/
-function rollDice() {
-    const userDice1 = Number(document.getElementById("dice1").value);
-    const userDice2 = Number(document.getElementById("dice2").value);
+/* ---------------- DICE ---------------- */
+function rollDice(){
+    dice1 = rand(1,6);
+    dice2 = rand(1,6);
 
-    const realDice1 = Math.floor(Math.random() * 6) + 1;
-    const realDice2 = Math.floor(Math.random() * 6) + 1;
+    document.getElementById("diceImg1").src = diceImages[dice1];
+    document.getElementById("diceImg2").src = diceImages[dice2];
 
-    // Check if user guessed correctly
-    if (userDice1 === realDice1 && userDice2 === realDice2) {
+    updateStatus("Enter sum!");
+}
 
-        let move = realDice1 + realDice2;
+/* ---------------- SUBMIT ---------------- */
+function submitAnswer(){
+    let sum = Number(document.getElementById("sumInput").value);
+    let correct = dice1 + dice2;
 
-        // Move player
-        players[currentPlayer].position += move;
+    let p = players[currentPlayer];
 
-        // Prevent going past 20
-        if (players[currentPlayer].position > maxSquares) {
-            players[currentPlayer].position = maxSquares;
+    if(sum === correct){
+        p.position += correct;
+
+        if(p.position > 20) p.position = 20;
+
+        if(ladders[p.position]) p.position = ladders[p.position];
+        if(snakes[p.position]) p.position = snakes[p.position];
+
+        if(p.position === 20){
+            alert(p.name + " wins!");
         }
 
-        document.getElementById("status").innerText =
-            `Correct! Player ${currentPlayer + 1} moves to square ${players[currentPlayer].position}`;
-
-        // Check win
-        if (players[currentPlayer].position === maxSquares) {
-            alert(`Player ${currentPlayer + 1} wins!`);
-        }
-
+        updateStatus("Correct!");
     } else {
-        document.getElementById("status").innerText =
-            `Wrong! Dice were ${realDice1} and ${realDice2}`;
+        updateStatus("Wrong! was " + correct);
     }
 
-    // Next player's turn
     currentPlayer = (currentPlayer + 1) % players.length;
-
     updatePlayers();
-    updateStatus();
 }
 
-/*
-    UPDATE TURN DISPLAY
-*/
-function updateStatus() {
-    document.getElementById("status").innerText +=
-        ` | Player ${currentPlayer + 1}'s turn`;
+/* ---------------- STATUS ---------------- */
+function updateStatus(msg){
+    let p = players[currentPlayer];
+    document.getElementById("status").innerText =
+        msg + " " + p.name + "'s turn (" + p.color + ")";
 }
 
-/*
-    RESET GAME
-*/
-function resetGame() {
+/* ---------------- RESET ---------------- */
+function resetGame(){
     players = [];
-    currentPlayer = 0;
+    snakes = {};
+    ladders = {};
     document.getElementById("board").innerHTML = "";
-    document.getElementById("status").innerText = "Game reset!";
+    document.getElementById("lineLayer").innerHTML = "";
+    document.getElementById("status").innerText = "Reset!";
+}
+
+/* ---------------- UTIL ---------------- */
+function rand(min,max){
+    return Math.floor(Math.random()*(max-min+1))+min;
 }
 </script>
 
